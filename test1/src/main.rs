@@ -376,8 +376,6 @@ struct Node {
     child: Option<Rc<Node>>,
 }
 
-
-
 macro_rules! BaseOf {
     ($BT:ty, $T:ty) => {
         impl Deref for $T {
@@ -388,6 +386,7 @@ macro_rules! BaseOf {
         }
     };
 }
+
 
 struct A {
     x:i32
@@ -409,26 +408,70 @@ fn NeedA(a:&A) {
     println!("{}", a.x);
 }
 
+
+
+
+
+
+
+#[derive(Debug, Default)]
+struct Shared<T> {
+    value: RefCell<Option<Rc<T>>>
+}
+impl<T> Deref for Shared<T> {
+    type Target = RefCell<Option<Rc<T>>>;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+impl<T> Shared<T> {
+    fn ToMut(&self) -> Option<&mut T> {
+        let o = self.value.borrow_mut();
+        if let Some(p) = o.as_deref() {
+            return Some(unsafe { &mut *(p as *const T as *mut T) });
+        }
+        return None
+    }
+}
+impl<T> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        Shared { value : self.value.clone() }
+    }
+}
+
+struct Foo {
+    parent: Shared<Foo>
+}
+
 fn main() {
-    let c = C{ base:B{base:A{x:1}} };
-    println!("{}", c.x);
-    NeedA(&c);
+    let foo = Shared::<Foo> { value: RefCell::new(None) };
+    if let Some(o) = foo.ToMut() {
+        o.parent = foo.clone();
+    }
+    //foo.v
 
-    let n = Rc::new(Node {
-        id: 1,
-        name: "p".to_string(),
-        parent: None,
-        child: None,
-    });
-    let c = Rc::new(Node {
-        id: 2,
-        name: "c".to_string(),
-        parent: Some( Rc::downgrade(&n) ),
-        child: None,
-    });
-    n.Mut().child = Some(c);
 
-    println!("{:?}", n);
+
+    // let c = C{ base:B{base:A{x:1}} };
+    // println!("{}", c.x);
+    // NeedA(&c);
+
+    // let mut n = Rc::new(Node {
+    //     id: 1,
+    //     name: "p".to_string(),
+    //     parent: None,
+    //     child: None,
+    // });
+    //n.child = Some(n);
+    // let c = Rc::new(Node {
+    //     id: 2,
+    //     name: "c".to_string(),
+    //     parent: Some( Rc::downgrade(&n) ),
+    //     child: None,
+    // });
+    //n.Mut().child = Some(c);
+
+    //println!("{:?}", n);
 
 
     //
